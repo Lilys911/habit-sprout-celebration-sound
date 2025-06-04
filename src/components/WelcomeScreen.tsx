@@ -11,8 +11,9 @@ interface WelcomeScreenProps {
 const WelcomeScreen = ({ onGetStarted, soundEnabled, onToggleSound }: WelcomeScreenProps) => {
   const audioContextRef = useRef<AudioContext | null>(null);
   const natureSoundsRef = useRef<{
+    waterfall?: { noise: AudioBufferSourceNode; gainNode: GainNode };
     wind?: { noise: AudioBufferSourceNode; gainNode: GainNode };
-    water?: { noise: AudioBufferSourceNode; gainNode: GainNode };
+    leaves?: { noise: AudioBufferSourceNode; gainNode: GainNode };
   }>({});
 
   useEffect(() => {
@@ -40,8 +41,8 @@ const WelcomeScreen = ({ onGetStarted, soundEnabled, onToggleSound }: WelcomeScr
       const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
       audioContextRef.current = audioContext;
       
-      // Create realistic bird calls
-      const createBirdCall = (type: 'robin' | 'sparrow' | 'cardinal' | 'dove', time: number) => {
+      // Create enhanced bird calls with better volume
+      const createBirdCall = (type: 'robin' | 'sparrow' | 'cardinal' | 'dove' | 'woodpecker' | 'owl', time: number) => {
         if (!audioContext || audioContext.state === 'closed') return;
         
         const oscillator = audioContext.createOscillator();
@@ -54,7 +55,7 @@ const WelcomeScreen = ({ onGetStarted, soundEnabled, onToggleSound }: WelcomeScr
         
         const currentTime = audioContext.currentTime + time;
         
-        // Different bird call patterns
+        // Enhanced bird call patterns with better volume
         switch (type) {
           case 'robin': // Cheerful warbling
             oscillator.type = 'sine';
@@ -64,7 +65,7 @@ const WelcomeScreen = ({ onGetStarted, soundEnabled, onToggleSound }: WelcomeScr
             oscillator.frequency.linearRampToValueAtTime(1600, currentTime + 0.45);
             oscillator.frequency.linearRampToValueAtTime(1000, currentTime + 0.6);
             gainNode.gain.setValueAtTime(0, currentTime);
-            gainNode.gain.linearRampToValueAtTime(0.03, currentTime + 0.05);
+            gainNode.gain.linearRampToValueAtTime(0.08, currentTime + 0.05);
             gainNode.gain.exponentialRampToValueAtTime(0.001, currentTime + 0.7);
             oscillator.start(currentTime);
             oscillator.stop(currentTime + 0.7);
@@ -77,7 +78,7 @@ const WelcomeScreen = ({ onGetStarted, soundEnabled, onToggleSound }: WelcomeScr
             oscillator.frequency.setValueAtTime(2000, currentTime + 0.1);
             oscillator.frequency.linearRampToValueAtTime(2300, currentTime + 0.15);
             gainNode.gain.setValueAtTime(0, currentTime);
-            gainNode.gain.linearRampToValueAtTime(0.025, currentTime + 0.01);
+            gainNode.gain.linearRampToValueAtTime(0.07, currentTime + 0.01);
             gainNode.gain.exponentialRampToValueAtTime(0.001, currentTime + 0.2);
             oscillator.start(currentTime);
             oscillator.stop(currentTime + 0.2);
@@ -88,7 +89,7 @@ const WelcomeScreen = ({ onGetStarted, soundEnabled, onToggleSound }: WelcomeScr
             oscillator.frequency.setValueAtTime(1800, currentTime);
             oscillator.frequency.linearRampToValueAtTime(1600, currentTime + 0.4);
             gainNode.gain.setValueAtTime(0, currentTime);
-            gainNode.gain.linearRampToValueAtTime(0.035, currentTime + 0.1);
+            gainNode.gain.linearRampToValueAtTime(0.09, currentTime + 0.1);
             gainNode.gain.exponentialRampToValueAtTime(0.001, currentTime + 0.5);
             oscillator.start(currentTime);
             oscillator.stop(currentTime + 0.5);
@@ -102,39 +103,155 @@ const WelcomeScreen = ({ onGetStarted, soundEnabled, onToggleSound }: WelcomeScr
             filter.type = 'lowpass';
             filter.frequency.setValueAtTime(800, currentTime);
             gainNode.gain.setValueAtTime(0, currentTime);
-            gainNode.gain.linearRampToValueAtTime(0.02, currentTime + 0.1);
+            gainNode.gain.linearRampToValueAtTime(0.06, currentTime + 0.1);
             gainNode.gain.exponentialRampToValueAtTime(0.001, currentTime + 0.8);
             oscillator.start(currentTime);
             oscillator.stop(currentTime + 0.8);
             break;
+
+          case 'woodpecker': // Rhythmic tapping
+            oscillator.type = 'square';
+            oscillator.frequency.setValueAtTime(800, currentTime);
+            filter.type = 'highpass';
+            filter.frequency.setValueAtTime(600, currentTime);
+            for (let i = 0; i < 5; i++) {
+              const tapTime = currentTime + i * 0.1;
+              gainNode.gain.setValueAtTime(0, tapTime);
+              gainNode.gain.linearRampToValueAtTime(0.05, tapTime + 0.01);
+              gainNode.gain.exponentialRampToValueAtTime(0.001, tapTime + 0.05);
+            }
+            oscillator.start(currentTime);
+            oscillator.stop(currentTime + 0.6);
+            break;
+
+          case 'owl': // Soft hooting
+            oscillator.type = 'sine';
+            oscillator.frequency.setValueAtTime(300, currentTime);
+            oscillator.frequency.linearRampToValueAtTime(280, currentTime + 0.5);
+            filter.type = 'lowpass';
+            filter.frequency.setValueAtTime(500, currentTime);
+            gainNode.gain.setValueAtTime(0, currentTime);
+            gainNode.gain.linearRampToValueAtTime(0.04, currentTime + 0.1);
+            gainNode.gain.exponentialRampToValueAtTime(0.001, currentTime + 1.0);
+            oscillator.start(currentTime);
+            oscillator.stop(currentTime + 1.0);
+            break;
         }
       };
       
-      // Create gentle water stream sound
-      const createWaterSound = () => {
+      // Create realistic waterfall sound
+      const createWaterfallSound = () => {
         if (!audioContext || audioContext.state === 'closed') return null;
         
         const noise = audioContext.createBufferSource();
-        const buffer = audioContext.createBuffer(1, audioContext.sampleRate * 4, audioContext.sampleRate);
-        const output = buffer.getChannelData(0);
+        const buffer = audioContext.createBuffer(2, audioContext.sampleRate * 8, audioContext.sampleRate);
         
-        // Generate pink noise for water-like sound
-        for (let i = 0; i < buffer.length; i++) {
-          output[i] = (Math.random() * 2 - 1) * 0.5;
+        // Generate stereo waterfall noise
+        for (let channel = 0; channel < 2; channel++) {
+          const output = buffer.getChannelData(channel);
+          for (let i = 0; i < buffer.length; i++) {
+            // Create cascading water sound with varying intensity
+            const variation = Math.sin(i * 0.0001) * 0.3 + 0.7;
+            output[i] = (Math.random() * 2 - 1) * variation * 0.8;
+          }
+        }
+        
+        noise.buffer = buffer;
+        
+        // Multiple filters for realistic waterfall effect
+        const filter1 = audioContext.createBiquadFilter();
+        filter1.type = 'highpass';
+        filter1.frequency.setValueAtTime(400, audioContext.currentTime);
+        
+        const filter2 = audioContext.createBiquadFilter();
+        filter2.type = 'lowpass';
+        filter2.frequency.setValueAtTime(4000, audioContext.currentTime);
+        
+        const filter3 = audioContext.createBiquadFilter();
+        filter3.type = 'peaking';
+        filter3.frequency.setValueAtTime(1200, audioContext.currentTime);
+        filter3.Q.setValueAtTime(2, audioContext.currentTime);
+        filter3.gain.setValueAtTime(3, audioContext.currentTime);
+        
+        const gainNode = audioContext.createGain();
+        gainNode.gain.setValueAtTime(0.12, audioContext.currentTime); // Much louder
+        
+        noise.connect(filter1);
+        filter1.connect(filter2);
+        filter2.connect(filter3);
+        filter3.connect(gainNode);
+        gainNode.connect(audioContext.destination);
+        
+        noise.loop = true;
+        noise.start();
+        
+        return { noise, gainNode };
+      };
+      
+      // Create gentle wind through trees
+      const createWindSound = () => {
+        if (!audioContext || audioContext.state === 'closed') return null;
+        
+        const noise = audioContext.createBufferSource();
+        const buffer = audioContext.createBuffer(2, audioContext.sampleRate * 6, audioContext.sampleRate);
+        
+        for (let channel = 0; channel < 2; channel++) {
+          const output = buffer.getChannelData(channel);
+          for (let i = 0; i < buffer.length; i++) {
+            // Create wind with natural fluctuations
+            const windVariation = Math.sin(i * 0.00005) * 0.5 + 0.5;
+            output[i] = (Math.random() * 2 - 1) * windVariation * 0.6;
+          }
+        }
+        
+        noise.buffer = buffer;
+        
+        const filter = audioContext.createBiquadFilter();
+        filter.type = 'lowpass';
+        filter.frequency.setValueAtTime(200, audioContext.currentTime);
+        
+        const gainNode = audioContext.createGain();
+        gainNode.gain.setValueAtTime(0.06, audioContext.currentTime); // Increased volume
+        
+        noise.connect(filter);
+        filter.connect(gainNode);
+        gainNode.connect(audioContext.destination);
+        
+        noise.loop = true;
+        noise.start();
+        
+        return { noise, gainNode };
+      };
+      
+      // Create falling leaves rustling sound
+      const createLeavesSound = () => {
+        if (!audioContext || audioContext.state === 'closed') return null;
+        
+        const noise = audioContext.createBufferSource();
+        const buffer = audioContext.createBuffer(2, audioContext.sampleRate * 5, audioContext.sampleRate);
+        
+        for (let channel = 0; channel < 2; channel++) {
+          const output = buffer.getChannelData(channel);
+          for (let i = 0; i < buffer.length; i++) {
+            // Create gentle rustling with sporadic intensity
+            const rustlePattern = Math.random() > 0.97 ? Math.random() * 0.8 : Math.random() * 0.2;
+            const frequency = Math.sin(i * 0.0003) * 0.3 + 0.4;
+            output[i] = (Math.random() * 2 - 1) * rustlePattern * frequency;
+          }
         }
         
         noise.buffer = buffer;
         
         const filter1 = audioContext.createBiquadFilter();
         filter1.type = 'highpass';
-        filter1.frequency.setValueAtTime(800, audioContext.currentTime);
+        filter1.frequency.setValueAtTime(1000, audioContext.currentTime);
         
         const filter2 = audioContext.createBiquadFilter();
         filter2.type = 'lowpass';
-        filter2.frequency.setValueAtTime(3000, audioContext.currentTime);
+        filter2.frequency.setValueAtTime(6000, audioContext.currentTime);
         
         const gainNode = audioContext.createGain();
-        gainNode.gain.setValueAtTime(0.008, audioContext.currentTime);
+        gainNode.gain.setValueAtTime(0.04, audioContext.currentTime); // Subtle but audible
         
         noise.connect(filter1);
         filter1.connect(filter2);
@@ -147,59 +264,36 @@ const WelcomeScreen = ({ onGetStarted, soundEnabled, onToggleSound }: WelcomeScr
         return { noise, gainNode };
       };
       
-      // Create enhanced wind sound
-      const createWindSound = () => {
-        if (!audioContext || audioContext.state === 'closed') return null;
-        
-        const noise = audioContext.createBufferSource();
-        const buffer = audioContext.createBuffer(1, audioContext.sampleRate * 3, audioContext.sampleRate);
-        const output = buffer.getChannelData(0);
-        
-        for (let i = 0; i < buffer.length; i++) {
-          output[i] = Math.random() * 2 - 1;
-        }
-        
-        noise.buffer = buffer;
-        
-        const filter = audioContext.createBiquadFilter();
-        filter.type = 'lowpass';
-        filter.frequency.setValueAtTime(150, audioContext.currentTime);
-        
-        const gainNode = audioContext.createGain();
-        gainNode.gain.setValueAtTime(0.015, audioContext.currentTime);
-        
-        noise.connect(filter);
-        filter.connect(gainNode);
-        gainNode.connect(audioContext.destination);
-        
-        noise.loop = true;
-        noise.start();
-        
-        return { noise, gainNode };
-      };
-      
-      // Start ambient sounds
+      // Start all ambient sounds with higher volumes
+      const waterfall = createWaterfallSound();
       const wind = createWindSound();
-      const water = createWaterSound();
-      natureSoundsRef.current = { wind, water };
+      const leaves = createLeavesSound();
+      natureSoundsRef.current = { waterfall, wind, leaves };
       
-      // Schedule varied bird calls
+      // Schedule more frequent and varied bird calls
       const scheduleBirds = () => {
         if (!audioContext || audioContext.state === 'closed') return;
         
-        const birdTypes: ('robin' | 'sparrow' | 'cardinal' | 'dove')[] = ['robin', 'sparrow', 'cardinal', 'dove'];
+        const birdTypes: ('robin' | 'sparrow' | 'cardinal' | 'dove' | 'woodpecker' | 'owl')[] = 
+          ['robin', 'sparrow', 'cardinal', 'dove', 'woodpecker', 'owl'];
         const randomBird = birdTypes[Math.floor(Math.random() * birdTypes.length)];
-        const callTime = Math.random() * 4 + 2; // Random interval between 2-6 seconds
+        const callTime = Math.random() * 3 + 1; // More frequent calls (1-4 seconds)
         
         createBirdCall(randomBird, callTime);
         
-        // Sometimes add a second bird call shortly after
-        if (Math.random() > 0.7) {
+        // Often add multiple birds calling
+        if (Math.random() > 0.5) {
           const secondBird = birdTypes[Math.floor(Math.random() * birdTypes.length)];
-          createBirdCall(secondBird, callTime + 1 + Math.random() * 2);
+          createBirdCall(secondBird, callTime + 0.5 + Math.random() * 1.5);
         }
         
-        setTimeout(scheduleBirds, (callTime + 3) * 1000);
+        // Sometimes add a third bird for richness
+        if (Math.random() > 0.8) {
+          const thirdBird = birdTypes[Math.floor(Math.random() * birdTypes.length)];
+          createBirdCall(thirdBird, callTime + 2 + Math.random() * 2);
+        }
+        
+        setTimeout(scheduleBirds, (callTime + 2) * 1000);
       };
       
       // Resume audio context if needed (for autoplay policy)
