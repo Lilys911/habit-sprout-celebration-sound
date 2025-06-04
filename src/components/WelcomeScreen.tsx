@@ -10,18 +10,23 @@ interface WelcomeScreenProps {
 
 const WelcomeScreen = ({ onGetStarted, soundEnabled, onToggleSound }: WelcomeScreenProps) => {
   const audioContextRef = useRef<AudioContext | null>(null);
-  const windSoundRef = useRef<{ noise: AudioBufferSourceNode; gainNode: GainNode } | null>(null);
+  const natureSoundsRef = useRef<{
+    wind?: { noise: AudioBufferSourceNode; gainNode: GainNode };
+    water?: { noise: AudioBufferSourceNode; gainNode: GainNode };
+  }>({});
 
   useEffect(() => {
     return () => {
       // Cleanup on unmount
-      if (windSoundRef.current?.noise) {
-        try {
-          windSoundRef.current.noise.stop();
-        } catch (e) {
-          console.log('Wind sound already stopped');
+      Object.values(natureSoundsRef.current).forEach(sound => {
+        if (sound?.noise) {
+          try {
+            sound.noise.stop();
+          } catch (e) {
+            console.log('Sound already stopped');
+          }
         }
-      }
+      });
       if (audioContextRef.current) {
         audioContextRef.current.close();
       }
@@ -35,36 +40,119 @@ const WelcomeScreen = ({ onGetStarted, soundEnabled, onToggleSound }: WelcomeScr
       const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
       audioContextRef.current = audioContext;
       
-      // Create gentle forest ambience with birds and wind
-      const createBirdChirp = (frequency: number, time: number) => {
+      // Create realistic bird calls
+      const createBirdCall = (type: 'robin' | 'sparrow' | 'cardinal' | 'dove', time: number) => {
         if (!audioContext || audioContext.state === 'closed') return;
         
         const oscillator = audioContext.createOscillator();
         const gainNode = audioContext.createGain();
+        const filter = audioContext.createBiquadFilter();
         
-        oscillator.connect(gainNode);
+        oscillator.connect(filter);
+        filter.connect(gainNode);
         gainNode.connect(audioContext.destination);
         
-        const currentTime = audioContext.currentTime;
-        oscillator.frequency.setValueAtTime(frequency, currentTime + time);
-        oscillator.frequency.linearRampToValueAtTime(frequency * 1.2, currentTime + time + 0.1);
-        oscillator.frequency.linearRampToValueAtTime(frequency, currentTime + time + 0.3);
+        const currentTime = audioContext.currentTime + time;
         
-        oscillator.type = 'sine';
-        gainNode.gain.setValueAtTime(0, currentTime + time);
-        gainNode.gain.linearRampToValueAtTime(0.02, currentTime + time + 0.05);
-        gainNode.gain.exponentialRampToValueAtTime(0.001, currentTime + time + 0.4);
-        
-        oscillator.start(currentTime + time);
-        oscillator.stop(currentTime + time + 0.4);
+        // Different bird call patterns
+        switch (type) {
+          case 'robin': // Cheerful warbling
+            oscillator.type = 'sine';
+            oscillator.frequency.setValueAtTime(1000, currentTime);
+            oscillator.frequency.linearRampToValueAtTime(1400, currentTime + 0.15);
+            oscillator.frequency.linearRampToValueAtTime(1200, currentTime + 0.3);
+            oscillator.frequency.linearRampToValueAtTime(1600, currentTime + 0.45);
+            oscillator.frequency.linearRampToValueAtTime(1000, currentTime + 0.6);
+            gainNode.gain.setValueAtTime(0, currentTime);
+            gainNode.gain.linearRampToValueAtTime(0.03, currentTime + 0.05);
+            gainNode.gain.exponentialRampToValueAtTime(0.001, currentTime + 0.7);
+            oscillator.start(currentTime);
+            oscillator.stop(currentTime + 0.7);
+            break;
+            
+          case 'sparrow': // Quick chirps
+            oscillator.type = 'triangle';
+            oscillator.frequency.setValueAtTime(2000, currentTime);
+            oscillator.frequency.linearRampToValueAtTime(2200, currentTime + 0.05);
+            oscillator.frequency.setValueAtTime(2000, currentTime + 0.1);
+            oscillator.frequency.linearRampToValueAtTime(2300, currentTime + 0.15);
+            gainNode.gain.setValueAtTime(0, currentTime);
+            gainNode.gain.linearRampToValueAtTime(0.025, currentTime + 0.01);
+            gainNode.gain.exponentialRampToValueAtTime(0.001, currentTime + 0.2);
+            oscillator.start(currentTime);
+            oscillator.stop(currentTime + 0.2);
+            break;
+            
+          case 'cardinal': // Clear whistle
+            oscillator.type = 'sine';
+            oscillator.frequency.setValueAtTime(1800, currentTime);
+            oscillator.frequency.linearRampToValueAtTime(1600, currentTime + 0.4);
+            gainNode.gain.setValueAtTime(0, currentTime);
+            gainNode.gain.linearRampToValueAtTime(0.035, currentTime + 0.1);
+            gainNode.gain.exponentialRampToValueAtTime(0.001, currentTime + 0.5);
+            oscillator.start(currentTime);
+            oscillator.stop(currentTime + 0.5);
+            break;
+            
+          case 'dove': // Gentle cooing
+            oscillator.type = 'sine';
+            oscillator.frequency.setValueAtTime(400, currentTime);
+            oscillator.frequency.linearRampToValueAtTime(350, currentTime + 0.3);
+            oscillator.frequency.linearRampToValueAtTime(400, currentTime + 0.6);
+            filter.type = 'lowpass';
+            filter.frequency.setValueAtTime(800, currentTime);
+            gainNode.gain.setValueAtTime(0, currentTime);
+            gainNode.gain.linearRampToValueAtTime(0.02, currentTime + 0.1);
+            gainNode.gain.exponentialRampToValueAtTime(0.001, currentTime + 0.8);
+            oscillator.start(currentTime);
+            oscillator.stop(currentTime + 0.8);
+            break;
+        }
       };
       
-      // Create wind sound
+      // Create gentle water stream sound
+      const createWaterSound = () => {
+        if (!audioContext || audioContext.state === 'closed') return null;
+        
+        const noise = audioContext.createBufferSource();
+        const buffer = audioContext.createBuffer(1, audioContext.sampleRate * 4, audioContext.sampleRate);
+        const output = buffer.getChannelData(0);
+        
+        // Generate pink noise for water-like sound
+        for (let i = 0; i < buffer.length; i++) {
+          output[i] = (Math.random() * 2 - 1) * 0.5;
+        }
+        
+        noise.buffer = buffer;
+        
+        const filter1 = audioContext.createBiquadFilter();
+        filter1.type = 'highpass';
+        filter1.frequency.setValueAtTime(800, audioContext.currentTime);
+        
+        const filter2 = audioContext.createBiquadFilter();
+        filter2.type = 'lowpass';
+        filter2.frequency.setValueAtTime(3000, audioContext.currentTime);
+        
+        const gainNode = audioContext.createGain();
+        gainNode.gain.setValueAtTime(0.008, audioContext.currentTime);
+        
+        noise.connect(filter1);
+        filter1.connect(filter2);
+        filter2.connect(gainNode);
+        gainNode.connect(audioContext.destination);
+        
+        noise.loop = true;
+        noise.start();
+        
+        return { noise, gainNode };
+      };
+      
+      // Create enhanced wind sound
       const createWindSound = () => {
         if (!audioContext || audioContext.state === 'closed') return null;
         
         const noise = audioContext.createBufferSource();
-        const buffer = audioContext.createBuffer(1, audioContext.sampleRate * 2, audioContext.sampleRate);
+        const buffer = audioContext.createBuffer(1, audioContext.sampleRate * 3, audioContext.sampleRate);
         const output = buffer.getChannelData(0);
         
         for (let i = 0; i < buffer.length; i++) {
@@ -75,10 +163,10 @@ const WelcomeScreen = ({ onGetStarted, soundEnabled, onToggleSound }: WelcomeScr
         
         const filter = audioContext.createBiquadFilter();
         filter.type = 'lowpass';
-        filter.frequency.setValueAtTime(200, audioContext.currentTime);
+        filter.frequency.setValueAtTime(150, audioContext.currentTime);
         
         const gainNode = audioContext.createGain();
-        gainNode.gain.setValueAtTime(0.03, audioContext.currentTime);
+        gainNode.gain.setValueAtTime(0.015, audioContext.currentTime);
         
         noise.connect(filter);
         filter.connect(gainNode);
@@ -90,21 +178,28 @@ const WelcomeScreen = ({ onGetStarted, soundEnabled, onToggleSound }: WelcomeScr
         return { noise, gainNode };
       };
       
-      // Start wind sound
+      // Start ambient sounds
       const wind = createWindSound();
-      windSoundRef.current = wind;
+      const water = createWaterSound();
+      natureSoundsRef.current = { wind, water };
       
-      // Schedule bird chirps
+      // Schedule varied bird calls
       const scheduleBirds = () => {
         if (!audioContext || audioContext.state === 'closed') return;
         
-        const birdFrequencies = [800, 1200, 1600, 2000];
-        const chirpTime = Math.random() * 3 + 1; // Random interval between 1-4 seconds
-        const frequency = birdFrequencies[Math.floor(Math.random() * birdFrequencies.length)];
+        const birdTypes: ('robin' | 'sparrow' | 'cardinal' | 'dove')[] = ['robin', 'sparrow', 'cardinal', 'dove'];
+        const randomBird = birdTypes[Math.floor(Math.random() * birdTypes.length)];
+        const callTime = Math.random() * 4 + 2; // Random interval between 2-6 seconds
         
-        createBirdChirp(frequency, chirpTime);
+        createBirdCall(randomBird, callTime);
         
-        setTimeout(scheduleBirds, (chirpTime + 2) * 1000);
+        // Sometimes add a second bird call shortly after
+        if (Math.random() > 0.7) {
+          const secondBird = birdTypes[Math.floor(Math.random() * birdTypes.length)];
+          createBirdCall(secondBird, callTime + 1 + Math.random() * 2);
+        }
+        
+        setTimeout(scheduleBirds, (callTime + 3) * 1000);
       };
       
       // Resume audio context if needed (for autoplay policy)
@@ -129,50 +224,58 @@ const WelcomeScreen = ({ onGetStarted, soundEnabled, onToggleSound }: WelcomeScr
       
       return () => clearTimeout(timer);
     } else {
-      // Stop wind sound when disabled
-      if (windSoundRef.current?.noise) {
-        try {
-          windSoundRef.current.noise.stop();
-        } catch (e) {
-          console.log('Wind sound already stopped');
+      // Stop all nature sounds when disabled
+      Object.values(natureSoundsRef.current).forEach(sound => {
+        if (sound?.noise) {
+          try {
+            sound.noise.stop();
+          } catch (e) {
+            console.log('Sound already stopped');
+          }
         }
-        windSoundRef.current = null;
-      }
+      });
+      natureSoundsRef.current = {};
     }
     
     return () => {
       // Cleanup
-      if (windSoundRef.current?.noise) {
-        try {
-          windSoundRef.current.noise.stop();
-        } catch (e) {
-          console.log('Wind sound already stopped');
+      Object.values(natureSoundsRef.current).forEach(sound => {
+        if (sound?.noise) {
+          try {
+            sound.noise.stop();
+          } catch (e) {
+            console.log('Sound already stopped');
+          }
         }
-      }
+      });
     };
   }, [soundEnabled]);
 
   const handleGetStarted = () => {
-    // Stop nature sounds before transitioning
-    if (windSoundRef.current?.gainNode && audioContextRef.current) {
-      try {
-        const currentTime = audioContextRef.current.currentTime;
-        windSoundRef.current.gainNode.gain.exponentialRampToValueAtTime(0.001, currentTime + 0.5);
-        setTimeout(() => {
-          if (windSoundRef.current?.noise) {
-            try {
-              windSoundRef.current.noise.stop();
-            } catch (e) {
-              console.log('Wind sound already stopped');
-            }
-          }
-        }, 600);
-      } catch (error) {
-        console.log('Error stopping wind sound:', error);
+    // Fade out nature sounds before transitioning
+    Object.values(natureSoundsRef.current).forEach(sound => {
+      if (sound?.gainNode && audioContextRef.current) {
+        try {
+          const currentTime = audioContextRef.current.currentTime;
+          sound.gainNode.gain.exponentialRampToValueAtTime(0.001, currentTime + 0.8);
+        } catch (error) {
+          console.log('Error fading sound:', error);
+        }
       }
-    }
+    });
     
-    setTimeout(onGetStarted, 300);
+    setTimeout(() => {
+      Object.values(natureSoundsRef.current).forEach(sound => {
+        if (sound?.noise) {
+          try {
+            sound.noise.stop();
+          } catch (e) {
+            console.log('Sound already stopped');
+          }
+        }
+      });
+      onGetStarted();
+    }, 900);
   };
 
   return (
