@@ -13,10 +13,10 @@ const WelcomeScreen = ({ onGetStarted, soundEnabled, onToggleSound }: WelcomeScr
   const audioRef = useRef<HTMLAudioElement>(null);
 
   useEffect(() => {
-    // Play ambient sound after a slight delay to respect autoplay policies
+    // Play nature sounds after a slight delay to respect autoplay policies
     const timer = setTimeout(() => {
       if (audioRef.current && soundEnabled) {
-        audioRef.current.volume = 0.3;
+        audioRef.current.volume = 0.2;
         audioRef.current.play().catch(console.log);
       }
     }, 1000);
@@ -24,19 +24,107 @@ const WelcomeScreen = ({ onGetStarted, soundEnabled, onToggleSound }: WelcomeScr
     return () => clearTimeout(timer);
   }, [soundEnabled]);
 
-  const handleGetStarted = () => {
-    // Fade out audio before transitioning
+  const createNatureSounds = () => {
+    if (!soundEnabled) return;
+    
+    const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+    
+    // Create gentle forest ambience with birds and wind
+    const createBirdChirp = (frequency: number, time: number) => {
+      const oscillator = audioContext.createOscillator();
+      const gainNode = audioContext.createGain();
+      
+      oscillator.connect(gainNode);
+      gainNode.connect(audioContext.destination);
+      
+      oscillator.frequency.setValueAtTime(frequency, audioContext.currentTime + time);
+      oscillator.frequency.linearRampToValueAtTime(frequency * 1.2, audioContext.currentTime + time + 0.1);
+      oscillator.frequency.linearRampToValueAtTime(frequency, audioContext.currentTime + time + 0.3);
+      
+      oscillator.type = 'sine';
+      gainNode.gain.setValueAtTime(0, audioContext.currentTime + time);
+      gainNode.gain.linearRampToValueAtTime(0.02, audioContext.currentTime + time + 0.05);
+      gainNode.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + time + 0.4);
+      
+      oscillator.start(audioContext.currentTime + time);
+      oscillator.stop(audioContext.currentTime + time + 0.4);
+    };
+    
+    // Create wind sound
+    const createWindSound = () => {
+      const noise = audioContext.createBufferSource();
+      const buffer = audioContext.createBuffer(1, audioContext.sampleRate * 2, audioContext.sampleRate);
+      const output = buffer.getChannelData(0);
+      
+      for (let i = 0; i < buffer.length; i++) {
+        output[i] = Math.random() * 2 - 1;
+      }
+      
+      noise.buffer = buffer;
+      
+      const filter = audioContext.createBiquadFilter();
+      filter.type = 'lowpass';
+      filter.frequency.setValueAtTime(200, audioContext.currentTime);
+      
+      const gainNode = audioContext.createGain();
+      gainNode.gain.setValueAtTime(0.03, audioContext.currentTime);
+      
+      noise.connect(filter);
+      filter.connect(gainNode);
+      gainNode.connect(audioContext.destination);
+      
+      noise.loop = true;
+      noise.start();
+      
+      return { noise, gainNode };
+    };
+    
+    // Start wind sound
+    const wind = createWindSound();
+    
+    // Schedule bird chirps
+    const scheduleBirds = () => {
+      const birdFrequencies = [800, 1200, 1600, 2000];
+      const chirpTime = Math.random() * 3 + 1; // Random interval between 1-4 seconds
+      const frequency = birdFrequencies[Math.floor(Math.random() * birdFrequencies.length)];
+      
+      createBirdChirp(frequency, chirpTime);
+      
+      setTimeout(scheduleBirds, (chirpTime + 2) * 1000);
+    };
+    
+    scheduleBirds();
+    
+    // Store for cleanup
     if (audioRef.current) {
-      const fadeOut = setInterval(() => {
-        if (audioRef.current && audioRef.current.volume > 0.05) {
-          audioRef.current.volume -= 0.05;
-        } else {
-          clearInterval(fadeOut);
-          if (audioRef.current) {
-            audioRef.current.pause();
-          }
-        }
-      }, 50);
+      (audioRef.current as any).windSound = wind;
+    }
+  };
+
+  useEffect(() => {
+    if (soundEnabled) {
+      createNatureSounds();
+    }
+    
+    return () => {
+      // Cleanup
+      if (audioRef.current && (audioRef.current as any).windSound) {
+        const wind = (audioRef.current as any).windSound;
+        if (wind.noise) wind.noise.stop();
+      }
+    };
+  }, [soundEnabled]);
+
+  const handleGetStarted = () => {
+    // Stop nature sounds before transitioning
+    if (audioRef.current && (audioRef.current as any).windSound) {
+      const wind = (audioRef.current as any).windSound;
+      if (wind.gainNode) {
+        wind.gainNode.gain.exponentialRampToValueAtTime(0.001, audioRef.current.context?.currentTime + 0.5);
+      }
+      setTimeout(() => {
+        if (wind.noise) wind.noise.stop();
+      }, 600);
     }
     
     setTimeout(onGetStarted, 300);
@@ -44,13 +132,8 @@ const WelcomeScreen = ({ onGetStarted, soundEnabled, onToggleSound }: WelcomeScr
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-100 via-green-50 to-teal-100 flex items-center justify-center relative overflow-hidden">
-      {/* Ambient Audio */}
-      <audio
-        ref={audioRef}
-        loop
-        preload="auto"
-        src="data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUYrTp66hVFApGn+DyvmEcBjiS2e/VfSUFl2+z7d6HNwgYZrjk5Z9NEQxPqdrws2MdCEOWp+vy0g=="
-      />
+      {/* Hidden audio element for reference */}
+      <audio ref={audioRef} style={{ display: 'none' }} />
       
       {/* Floating Elements Background */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">

@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -19,32 +18,67 @@ const HabitForm = ({ onHabitCreated, soundEnabled }: HabitFormProps) => {
   const [showCelebration, setShowCelebration] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const playCelebrationSound = () => {
+  const playWinningSound = () => {
     if (!soundEnabled) return;
     
-    // Create a simple celebration sound using Web Audio API
     const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
     
-    // Create a series of ascending tones for a "success" sound
-    const frequencies = [523.25, 659.25, 783.99]; // C5, E5, G5
-    
-    frequencies.forEach((freq, index) => {
+    // Create an epic winning fanfare sound
+    const createNote = (frequency: number, startTime: number, duration: number, volume: number = 0.1) => {
       const oscillator = audioContext.createOscillator();
       const gainNode = audioContext.createGain();
       
       oscillator.connect(gainNode);
       gainNode.connect(audioContext.destination);
       
-      oscillator.frequency.setValueAtTime(freq, audioContext.currentTime);
-      oscillator.type = 'sine';
+      oscillator.frequency.setValueAtTime(frequency, audioContext.currentTime + startTime);
+      oscillator.type = 'triangle';
       
-      gainNode.gain.setValueAtTime(0, audioContext.currentTime);
-      gainNode.gain.linearRampToValueAtTime(0.1, audioContext.currentTime + 0.01 + index * 0.1);
-      gainNode.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + 0.3 + index * 0.1);
+      gainNode.gain.setValueAtTime(0, audioContext.currentTime + startTime);
+      gainNode.gain.linearRampToValueAtTime(volume, audioContext.currentTime + startTime + 0.05);
+      gainNode.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + startTime + duration);
       
-      oscillator.start(audioContext.currentTime + index * 0.1);
-      oscillator.stop(audioContext.currentTime + 0.3 + index * 0.1);
+      oscillator.start(audioContext.currentTime + startTime);
+      oscillator.stop(audioContext.currentTime + startTime + duration);
+    };
+    
+    // Play a triumphant melody (C major scale going up)
+    const notes = [
+      { freq: 523.25, time: 0, duration: 0.3 },     // C5
+      { freq: 659.25, time: 0.15, duration: 0.3 },  // E5
+      { freq: 783.99, time: 0.3, duration: 0.3 },   // G5
+      { freq: 1046.5, time: 0.45, duration: 0.6 },  // C6 (held longer)
+    ];
+    
+    notes.forEach(note => {
+      createNote(note.freq, note.time, note.duration, 0.15);
     });
+    
+    // Add some sparkle with higher notes
+    setTimeout(() => {
+      createNote(1567.98, 0, 0.2, 0.08); // G6
+      createNote(1975.53, 0.1, 0.2, 0.08); // B6
+      createNote(2093, 0.2, 0.4, 0.1); // C7
+    }, 200);
+    
+    // Add a bell-like sound for extra celebration
+    setTimeout(() => {
+      const bell = audioContext.createOscillator();
+      const bellGain = audioContext.createGain();
+      
+      bell.connect(bellGain);
+      bellGain.connect(audioContext.destination);
+      
+      bell.frequency.setValueAtTime(2093, audioContext.currentTime); // C7
+      bell.type = 'sine';
+      
+      bellGain.gain.setValueAtTime(0, audioContext.currentTime);
+      bellGain.gain.linearRampToValueAtTime(0.1, audioContext.currentTime + 0.01);
+      bellGain.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + 1);
+      
+      bell.start();
+      bell.stop(audioContext.currentTime + 1);
+    }, 600);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -64,9 +98,9 @@ const HabitForm = ({ onHabitCreated, soundEnabled }: HabitFormProps) => {
       createdAt: new Date()
     };
 
-    // Show celebration effect
+    // Show celebration effect and play winning sound
     setShowCelebration(true);
-    playCelebrationSound();
+    playWinningSound();
 
     // Wait for animation to complete
     setTimeout(() => {
